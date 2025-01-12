@@ -25,14 +25,14 @@ function obterProximoJogo(idTime) {
         https.get(url, options, (res) => {
             let data = '';
 
-            console.log(`Status Code: ${res.statusCode}`);
+            console.error(`Status Code: ${res.statusCode}`);
 
             res.on('data', (chunk) => {
                 data += chunk;
             });
 
             res.on('end', () => {
-                console.log('Resposta da API:', data);
+                console.error('Resposta da API:', data);
                 try {
                     const dados = JSON.parse(data);
                     if (dados.events && dados.events.length > 0) {
@@ -57,7 +57,7 @@ function obterProximoJogo(idTime) {
                                     formatarData(dataAtual, { year: 'numeric', month: '2-digit', day: '2-digit' }),
                         });
                     } else {
-                        console.warn('Nenhum evento encontrado na resposta.');
+                        console.error('Nenhum evento encontrado na resposta.');
                         resolve(null);
                     }
                 } catch (erro) {
@@ -75,7 +75,7 @@ function obterProximoJogo(idTime) {
 const cliente = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 
 cliente.once('ready', () => {
-    console.log(`Bot está online como ${cliente.user.tag}!`);
+    console.error(`Bot está online como ${cliente.user.tag}!`);
 
     setInterval(async () => {
         const canal = cliente.channels.cache.find(canal => canal.name === 'geral');
@@ -93,7 +93,7 @@ cliente.once('ready', () => {
         }
     }, 24 * 60 * 60 * 1000);
 
-    console.log('Tarefas agendadas para mensagens diárias.');
+    console.error('Tarefas agendadas para mensagens diárias.');
 });
 
 cliente.login(DISCORD_TOKEN);
