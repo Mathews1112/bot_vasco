@@ -1,4 +1,6 @@
 const { Client, GatewayIntentBits } = require('discord.js');
+const axios = require('axios');
+const cron = require('node-cron');
 require('dotenv').config();
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const ID_TIME = 1974;
