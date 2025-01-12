@@ -25,11 +25,14 @@ function obterProximoJogo(idTime) {
         https.get(url, options, (res) => {
             let data = '';
 
+            console.log(`Status Code: ${res.statusCode}`);
+
             res.on('data', (chunk) => {
                 data += chunk;
             });
 
             res.on('end', () => {
+                console.log('Resposta da API:', data);
                 try {
                     const dados = JSON.parse(data);
                     if (dados.events && dados.events.length > 0) {
@@ -54,6 +57,7 @@ function obterProximoJogo(idTime) {
                                     formatarData(dataAtual, { year: 'numeric', month: '2-digit', day: '2-digit' }),
                         });
                     } else {
+                        console.warn('Nenhum evento encontrado na resposta.');
                         resolve(null);
                     }
                 } catch (erro) {
