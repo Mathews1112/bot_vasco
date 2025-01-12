@@ -1,0 +1,12 @@
+{
+    "name": "bot-do-vasco",
+    "version": "1.0.0",
+    "description": "Bot do Discord para informações do Vasco",
+    "main": "bot.js",
+    "scripts": {
+    "start": "node bot.js"
+    },
+  "dependencies": {
+    "discord.js": "^14.17.3"
+  }
+}
