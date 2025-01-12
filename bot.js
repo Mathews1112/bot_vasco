@@ -1,6 +1,6 @@
 const { Client, GatewayIntentBits } = require('discord.js');
-
-const DISCORD_TOKEN = '';
+require('dotenv').config();
+const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const ID_TIME = 1974;
 const API_BASE = 'https://api.sofascore.com/api/v1';
 const FUSO_HORARIO = 'America/Sao_Paulo';

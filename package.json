@@ -4,9 +4,10 @@
     "description": "Bot do Discord para informações do Vasco",
     "main": "bot.js",
     "scripts": {
-    "start": "node bot.js"
+        "start": "node bot.js"
     },
-  "dependencies": {
-    "discord.js": "^14.17.3"
-  }
+    "dependencies": {
+        "discord.js": "^14.17.3",
+        "dotenv": "^16.4.7"
+    }
 }
