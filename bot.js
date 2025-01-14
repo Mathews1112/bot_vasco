@@ -87,7 +87,7 @@ cliente.once('ready', () => {
         const jogo = await obterProximoJogo(ID_TIME);
 
         if (jogo && jogo.ehHoje) {
-            const canal = cliente.channels.cache.find(canal => canal.name === 'planeta-vegetti99' || canal.name === 'geral');
+            const canal = cliente.channels.cache.find(canal => canal.name === 'planeta-vegetti99');
             if (canal) {
                 const mensagem = `🔥 **Hoje tem jogo do Gigante!**\n🏆 **Campeonato:** ${jogo.nomeTorneio}\n⚔️ **Contra:** ${jogo.timeVisitante}\n⏰ **Horário:** ${formatarData(jogo.dataInicio, { hour: '2-digit', minute: '2-digit' })}`;
                 canal.send(mensagem);
