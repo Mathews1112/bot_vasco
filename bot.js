@@ -1,9 +1,15 @@
 const { Client, GatewayIntentBits } = require('discord.js');
 require('dotenv').config();
+const https = require('https');
+const cron = require('node-cron');
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const ID_TIME = 1974;
 const API_BASE = 'https://api.sofascore.com/api/v1';
 const FUSO_HORARIO = 'America/Sao_Paulo';
+
+// Variáveis de cache
+let cacheJogo = null;
+let cacheDataExpiracao = null;
 
 function formatarData(data, opcoes = {}) {
     return new Intl.DateTimeFormat('pt-BR', {
@@ -12,35 +18,60 @@ function formatarData(data, opcoes = {}) {
     }).format(data);
 }
 
+function fazerRequisicao(url) {
+    return new Promise((resolve, reject) => {
+        https.get(url, (res) => {
+            let dados = '';
+
+            res.on('data', (chunk) => {
+                dados += chunk;
+            });
+
+            res.on('end', () => {
+                try {
+                    const json = JSON.parse(dados);
+                    resolve(json);
+                } catch (erro) {
+                    reject(new Error('Erro ao analisar resposta JSON.'));
+                }
+            });
+        }).on('error', (erro) => {
+            reject(erro);
+        });
+    });
+}
+
 async function obterProximoJogo(idTime) {
+    const agora = new Date();
+
+    if (cacheJogo && cacheDataExpiracao && agora < cacheDataExpiracao) {
+        return cacheJogo;
+    }
+
     try {
-        const resposta = await fetch(`${API_BASE}/team/${idTime}/events/next/0`);
-        const dados = await resposta.json();
+        const url = `${API_BASE}/team/${idTime}/events/next/0`;
+        const dados = await fazerRequisicao(url);
 
-        if (resposta.ok && dados.events && dados.events.length > 0) {
+        if (dados.events && dados.events.length > 0) {
             const proximoEvento = dados.events[0];
-            const nomeTorneio = proximoEvento.tournament.name;
-            const timeCasa = proximoEvento.homeTeam.name;
-            const timeVisitante = proximoEvento.awayTeam.name;
-            const estadio = proximoEvento.venue?.stadium || 'Local não informado';
-            const horarioInicio = proximoEvento.startTimestamp;
-            const dataInicio = new Date(horarioInicio * 1000);
+            const horarioInicio = proximoEvento.startTimestamp * 1000;
+            const dataInicio = new Date(horarioInicio);
             const dataAtual = new Date();
-            const diasAteJogo = Math.ceil((dataInicio - dataAtual) / (1000 * 60 * 60 * 24));
 
-            return {
-                nomeTorneio,
-                timeCasa,
-                timeVisitante,
-                estadio,
+            cacheJogo = {
+                nomeTorneio: proximoEvento.tournament.name,
+                timeCasa: proximoEvento.homeTeam.name,
+                timeVisitante: proximoEvento.awayTeam.name,
+                estadio: proximoEvento.venue?.stadium || 'Local não informado',
                 dataInicio,
-                diasAteJogo,
-                ehHoje: formatarData(dataInicio, { year: 'numeric', month: '2-digit', day: '2-digit' }) ===
-                        formatarData(dataAtual, { year: 'numeric', month: '2-digit', day: '2-digit' }),
+                ehHoje: formatarData(dataInicio) === formatarData(dataAtual),
             };
-        } else {
-            return null;
+
+            cacheDataExpiracao = new Date(agora.getTime() + 6 * 60 * 60 * 1000);
+
+            return cacheJogo;
         }
+        return null;
     } catch (erro) {
         console.error('Erro ao buscar informações do próximo jogo:', erro.message);
         return null;
@@ -52,38 +83,31 @@ const cliente = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBi
 cliente.once('ready', () => {
     console.log(`Bot está online como ${cliente.user.tag}!`);
 
-    setInterval(async () => {
-        const canal = cliente.channels.cache.find(canal => canal.name === 'geral');
-        if (canal) {
-            const jogo = await obterProximoJogo(ID_TIME);
-            if (jogo) {
-                if (jogo.ehHoje) {
-                    canal.send(`🔥 **Hoje tem jogo do Gigante!**\n🏆 **Campeonato:** ${jogo.nomeTorneio}\n⚔️ **Contra:** ${jogo.timeVisitante === 'Vasco da Gama' ? jogo.timeCasa : jogo.timeVisitante}\n⏰ **Horário:** ${formatarData(jogo.dataInicio, { hour: '2-digit', minute: '2-digit' })}`);
-                } else {
-                    canal.send(`⚽ **Próximo jogo do Vasco:**\n🏆 **Campeonato:** ${jogo.nomeTorneio}\n🏠 **Time da Casa:** ${jogo.timeCasa}\n🛫 **Time Visitante:** ${jogo.timeVisitante}\n⏰ **Horário:** ${formatarData(jogo.dataInicio, {
-                        year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
-                    })}\n📅 **Dias Restantes:** ${jogo.diasAteJogo} dia(s)`);
-                }
+    cron.schedule('0 9 * * *', async () => {
+        const jogo = await obterProximoJogo(ID_TIME);
+
+        if (jogo && jogo.ehHoje) {
+            const canal = cliente.channels.cache.find(canal => canal.name === 'planeta-vegetti99' || canal.name === 'geral');
+            if (canal) {
+                const mensagem = `🔥 **Hoje tem jogo do Gigante!**\n🏆 **Campeonato:** ${jogo.nomeTorneio}\n⚔️ **Contra:** ${jogo.timeVisitante}\n⏰ **Horário:** ${formatarData(jogo.dataInicio, { hour: '2-digit', minute: '2-digit' })}`;
+                canal.send(mensagem);
             } else {
-                canal.send('Nenhum jogo encontrado para o Vasco.');
+                console.error('Canal não encontrado.');
             }
         }
-    }, 24 * 60 * 60 * 1000);
+    });
 
-    console.log('Tarefas agendadas para mensagens diárias.');
+    console.log('Tarefa agendada para enviar mensagem no dia do jogo às 9h.');
 });
 
 cliente.on('messageCreate', async mensagem => {
     if (mensagem.content.toLowerCase() === '!vasco') {
         const jogo = await obterProximoJogo(ID_TIME);
         if (jogo) {
-            if (jogo.ehHoje) {
-                mensagem.channel.send(`🔥 **Hoje tem jogo do Gigante!**\n🏆 **Campeonato:** ${jogo.nomeTorneio}\n⚔️ **Contra:** ${jogo.timeVisitante === 'Vasco da Gama' ? jogo.timeCasa : jogo.timeVisitante}\n⏰ **Horário:** ${formatarData(jogo.dataInicio, { hour: '2-digit', minute: '2-digit' })}`);
-            } else {
-                mensagem.channel.send(`⚽ **Próximo jogo do Vasco:**\n🏆 **Campeonato:** ${jogo.nomeTorneio}\n🏠 **Time da Casa:** ${jogo.timeCasa}\n🛫 **Time Visitante:** ${jogo.timeVisitante}\n⏰ **Horário:** ${formatarData(jogo.dataInicio, {
-                    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
-                })}\n📅 **Dias Restantes:** ${jogo.diasAteJogo} dia(s)`);
-            }
+            const mensagemResposta = jogo.ehHoje
+                ? `🔥 **Hoje tem jogo do Gigante!**\n🏆 **Campeonato:** ${jogo.nomeTorneio}\n⚔️ **Contra:** ${jogo.timeVisitante}\n⏰ **Horário:** ${formatarData(jogo.dataInicio, { hour: '2-digit', minute: '2-digit' })}`
+                : `⚽ **Próximo jogo do Vasco:**\n🏆 **Campeonato:** ${jogo.nomeTorneio}\n🏠 **Time da Casa:** ${jogo.timeCasa}\n🛫 **Time Visitante:** ${jogo.timeVisitante}\n⏰ **Horário:** ${formatarData(jogo.dataInicio, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}`;
+            mensagem.channel.send(mensagemResposta);
         } else {
             mensagem.channel.send('Nenhum jogo encontrado para o Vasco.');
         }
